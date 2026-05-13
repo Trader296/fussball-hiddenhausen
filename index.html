@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>⚽ SpVg. Hiddenhausen</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a4a1a;
+      color: white;
+      min-height: 100vh;
+    }
+    header {
+      background: #0d2e0d;
+      padding: 20px;
+      text-align: center;
+      border-bottom: 4px solid #FFD700;
+    }
+    header h1 {
+      font-size: 28px;
+      color: #FFD700;
+      margin-bottom: 4px;
+    }
+    header p {
+      font-size: 16px;
+      color: #aaa;
+    }
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: #0d2e0d;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 20px 10px;
+      font-size: 20px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      background: #0d2e0d;
+      color: #aaa;
+      border-bottom: 4px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #FFD700;
+      border-bottom: 4px solid #FFD700;
+      background: #162e16;
+    }
+    #content {
+      padding: 20px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .loading {
+      text-align: center;
+      font-size: 22px;
+      padding: 50px 20px;
+      color: #FFD700;
+    }
+    .spinner {
+      font-size: 40px;
+      display: block;
+      margin-bottom: 15px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 17px;
+    }
+    th {
+      background: #FFD700;
+      color: #0d2e0d;
+      padding: 12px 6px;
+      text-align: center;
+      font-size: 15px;
+    }
+    td {
+      padding: 13px 6px;
+      text-align: center;
+      border-bottom: 1px solid #2a4a2a;
+    }
+    td.name {
+      text-align: left;
+      font-size: 15px;
+    }
+    tr.highlight {
+      background: #FFD700 !important;
+      color: #0d2e0d;
+      font-weight: bold;
+    }
+    tr:not(.highlight):hover { background: #2a5a2a; }
+    .spiel-card {
+      background: #0d2e0d;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      padding: 15px 18px;
+      border-left: 4px solid #FFD700;
+    }
+    .spiel-datum {
+      font-size: 13px;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+    .spiel-teams {
+      font-size: 19px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .spiel-ergebnis {
+      background: #FFD700;
+      color: #0d2e0d;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 20px;
+      white-space: nowrap;
+      min-width: 70px;
+      text-align: center;
+    }
+    .spiel-team { flex: 1; }
+    .spiel-team.gast { text-align: right; }
+    .hiddenhausen { color: #FFD700; }
+    .fehler {
+      text-align: center;
+      background: #2a0d0d;
+      border: 2px solid #ff6b6b;
+      border-radius: 12px;
+      padding: 25px;
+      margin: 10px 0;
+    }
+    .fehler h3 { color: #ff6b6b; margin-bottom: 10px; font-size: 20px; }
+    .fehler p { color: #ccc; font-size: 16px; line-height: 1.5; }
+    .fupa-btn {
+      display: block;
+      background: #FFD700;
+      color: #0d2e0d;
+      text-decoration: none;
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      padding: 22px;
+      border-radius: 14px;
+      margin: 20px 0;
+    }
+    .update-info {
+      text-align: center;
+      color: #666;
+      font-size: 13px;
+      padding: 15px;
+    }
+    .debug {
+      background: #111;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ SpVg. Hiddenhausen</h1>
+  <p>Bezirksliga Westfalen · Staffel 1</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="zeigeTab('tabelle', this)">🏆 Tabelle</button>
+  <button class="tab-btn" onclick="zeigeTab('spiele', this)">📅 Spiele</button>
+  <button class="tab-btn" onclick="zeigeTab('verein', this)">👕 Hiddenhausen</button>
+</div>
+
+<div id="content">
+  <div class="loading"><span class="spinner">⚽</span>Lade Daten…</div>
+</div>
+<div class="update-info" id="update-info"></div>
+
+<script>
+let cache = {};
+let aktTab = 'tabelle';
+
+async function ladeDaten(type) {
+  if (cache[type] && (Date.now() - cache[type].time < 10 * 60 * 1000)) {
+    return cache[type].data;
+  }
+  const res = await fetch(`/.netlify/functions/fupa?type=${type}`);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  cache[type] = { data, time: Date.now() };
+  return data;
+}
+
+function zeigeTab(tab, btn) {
+  aktTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render(tab);
+}
+
+async function render(type) {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="loading"><span class="spinner">⚽</span>Lade Daten…</div>';
+  document.getElementById('update-info').textContent = '';
+
+  try {
+    const data = await ladeDaten(type);
+    
+    if (!data.ok && !data.nextData) {
+      zeigeFallback(el, type, data);
+      return;
+    }
+
+    const nextData = data.nextData;
+    let html = '';
+
+    if (type === 'tabelle') {
+      html = baueTabelle(nextData, data.tableRows);
+    } else if (type === 'spiele') {
+      html = baueSpiele(nextData);
+    } else {
+      html = baueVerein(nextData);
+    }
+
+    if (!html) {
+      zeigeFallback(el, type, data);
+      return;
+    }
+
+    el.innerHTML = html;
+    document.getElementById('update-info').textContent =
+      'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr';
+
+  } catch(e) {
+    zeigeFallback(el, type, { error: e.message });
+  }
+}
+
+function baueTabelle(nextData, tableRows) {
+  // Try tableRows first (simpler HTML parse)
+  if (tableRows && tableRows.length > 0) {
+    let html = '<table><tr><th>#</th><th style="text-align:left">Verein</th><th>Sp</th><th>Pkt</th></tr>';
+    tableRows.forEach(r => {
+      const isH = r.verein.toLowerCase().includes('hiddenhausen');
+      html += `<tr class="${isH ? 'highlight' : ''}">
+        <td>${r.platz}</td>
+        <td class="name">${isH ? '⭐ ' : ''}${r.verein}</td>
+        <td>${r.spiele}</td>
+        <td><b>${r.punkte}</b></td>
+      </tr>`;
+    });
+    html += '</table>';
+    return html;
+  }
+
+  // Try nextData
+  if (!nextData) return null;
+  try {
+    const props = nextData.props?.pageProps;
+    const teams = props?.table || props?.standing || props?.tableData || props?.data?.table;
+    if (!teams || !teams.length) return null;
+
+    let html = '<table><tr><th>#</th><th style="text-align:left">Verein</th><th>Sp</th><th>S</th><th>U</th><th>N</th><th>Tore</th><th>Pkt</th></tr>';
+    teams.forEach((t, i) => {
+      const name = t.team?.name || t.teamName || t.name || '?';
+      const isH = name.toLowerCase().includes('hiddenhausen');
+      html += `<tr class="${isH ? 'highlight' : ''}">
+        <td>${i+1}</td>
+        <td class="name">${isH ? '⭐ ' : ''}${name}</td>
+        <td>${t.matches || t.gamesPlayed || '-'}</td>
+        <td>${t.wins || t.won || '-'}</td>
+        <td>${t.draws || t.draw || '-'}</td>
+        <td>${t.losses || t.lost || '-'}</td>
+        <td>${t.goals || '-'}:${t.goalsAgainst || '-'}</td>
+        <td><b>${t.points || '-'}</b></td>
+      </tr>`;
+    });
+    html += '</table>';
+    return html;
+  } catch(e) { return null; }
+}
+
+function baueSpiele(nextData) {
+  if (!nextData) return null;
+  try {
+    const props = nextData.props?.pageProps;
+    const matches = props?.matches || props?.matchData || props?.data?.matches || props?.matchdays?.flatMap(d => d.matches);
+    if (!matches || !matches.length) return null;
+
+    // Show last 10 + next 5
+    const recent = matches.slice(-15);
+    let html = '';
+    recent.reverse().forEach(m => {
+      const heim = m.homeTeam?.name || m.home?.name || '?';
+      const gast = m.guestTeam?.name || m.guest?.name || '?';
+      const ergebnis = m.result || (m.goalsHome !== undefined && m.goalsHome !== null ? `${m.goalsHome}:${m.goalsGuest}` : '-:-');
+      const datum = m.date ? new Date(m.date).toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric'}) : '';
+      const heimH = heim.toLowerCase().includes('hiddenhausen');
+      const gastH = gast.toLowerCase().includes('hiddenhausen');
+      html += `<div class="spiel-card">
+        <div class="spiel-datum">📅 ${datum}</div>
+        <div class="spiel-teams">
+          <span class="spiel-team ${heimH ? 'hiddenhausen' : ''}">${heim}</span>
+          <span class="spiel-ergebnis">${ergebnis}</span>
+          <span class="spiel-team gast ${gastH ? 'hiddenhausen' : ''}">${gast}</span>
+        </div>
+      </div>`;
+    });
+    return html || null;
+  } catch(e) { return null; }
+}
+
+function baueVerein(nextData) {
+  if (!nextData) return null;
+  try {
+    const props = nextData.props?.pageProps;
+    const matches = props?.matches || props?.recentMatches || props?.data?.matches;
+    if (!matches || !matches.length) return null;
+    return baueSpiele(nextData); // Same format
+  } catch(e) { return null; }
+}
+
+function zeigeFallback(el, type, data) {
+  const links = {
+    tabelle: 'https://www.fupa.net/league/bezirksliga-westfalen-staffel-1/table',
+    spiele:  'https://www.fupa.net/league/bezirksliga-westfalen-staffel-1/matches',
+    verein:  'https://www.fupa.net/club/spvg-hiddenhausen',
+  };
+  el.innerHTML = `
+    <div class="fehler">
+      <h3>⚠️ Daten konnten nicht angezeigt werden</h3>
+      <p>FuPa hat die Seite nicht im erwarteten Format geliefert.</p>
+    </div>
+    <a class="fupa-btn" href="${links[type]}" target="_blank">🔗 FuPa direkt öffnen</a>
+    <details>
+      <summary style="color:#666; cursor:pointer; padding:10px;">🔧 Debug-Info</summary>
+      <div class="debug">${JSON.stringify(data, null, 2).substring(0, 2000)}</div>
+    </details>`;
+}
+
+// Sofort laden beim Start
+render('tabelle');
+</script>
+
+</body>
+</html>
